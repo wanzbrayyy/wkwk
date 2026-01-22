@@ -16,8 +16,7 @@ export function MonacoEditor({
   onChange,
   readOnly = false 
 }: MonacoEditorProps) {
-  // PERBAIKAN: Tambahkan <any> agar ref bisa menerima instance editor
-  const editorRef = useRef<any>(null)
+  const editorRef = useRef(null)
 
   const handleEditorDidMount: OnMount = (editor) => {
     editorRef.current = editor
