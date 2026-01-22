@@ -1,6 +1,6 @@
 import { OpenAIStream, StreamingTextResponse } from "ai"
 import { getServerSession } from "next-auth"
-import { authOptions } from "../auth/[...nextauth]/route"
+import { authOptions } from "@/lib/auth" // UPDATE DISINI
 import { db } from "@/lib/db"
 import { openai } from "@/lib/ai/openai"
 

@@ -1,10 +1,10 @@
 import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth" // UPDATE DISINI
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/db"
 import { redirect, notFound } from "next/navigation"
 import { 
   ArrowLeft, Play, Save, Download, FileCode2, 
-  Settings, Bot, Search, Plus, X, Code2 
+  Settings, Bot, Search, Plus, X 
 } from "lucide-react"
 import Link from "next/link"
 

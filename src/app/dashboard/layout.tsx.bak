@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation"
 import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth" // UPDATE DISINI
+import { authOptions } from "../api/auth/[...nextauth]/route"
 import Link from "next/link"
-import { User, Code2 } from "lucide-react"
+import { User, LogOut, Code2 } from "lucide-react"
 
 export default async function DashboardLayout({
   children,
