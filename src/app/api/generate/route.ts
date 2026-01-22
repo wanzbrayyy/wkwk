@@ -1,6 +1,6 @@
 import { OpenAIStream, StreamingTextResponse } from "ai"
 import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth" // UPDATE DISINI
+import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { openai } from "@/lib/ai/openai"
 
@@ -22,6 +22,8 @@ export async function POST(req: Request) {
   }
 
   const lastMessage = messages[messages.length - 1]
+  
+  // Simpan pesan user ke DB
   await db.message.create({
     data: {
       role: "user",
@@ -30,6 +32,7 @@ export async function POST(req: Request) {
     }
   })
 
+  // Panggil OpenRouter (Deepseek)
   const response = await openai.chat.completions.create({
     model: "tngtech/deepseek-r1t2-chimera:free",
     stream: true,
@@ -42,8 +45,10 @@ export async function POST(req: Request) {
     ]
   })
 
-  const stream = OpenAIStream(response, {
+  // PERBAIKAN: Gunakan 'as any' pada response untuk mengatasi error TypeScript
+  const stream = OpenAIStream(response as any, {
     onCompletion: async (completion) => {
+      // Simpan balasan AI ke DB setelah stream selesai
       await db.message.create({
         data: {
           role: "assistant",
