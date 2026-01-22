@@ -1,7 +1,6 @@
 import { useChat } from "ai/react"
 import { toast } from "sonner"
 import { useEditorStore } from "./use-editor-store"
-import React from "react" // Import React untuk FormEvent
 
 interface UseCodeGenerationProps {
   projectId: string
@@ -33,6 +32,8 @@ export function useCodeGeneration({ projectId, initialMessages = [] }: UseCodeGe
     },
     onFinish: (message) => {
       if (message.role === "assistant" && message.content.includes("```")) {
+        // Simple heuristic to detect if AI returned a code block to replace content
+        // In a real app, you might want structured output or function calling
         toast.success("Code generation completed")
       }
     },
@@ -47,10 +48,11 @@ export function useCodeGeneration({ projectId, initialMessages = [] }: UseCodeGe
       return
     }
     
-    // PERBAIKAN: Spesifikasikan tipe generic untuk FormEvent
+    // Custom trigger logic could go here to hit a specific code-only endpoint
+    // utilizing the handleSubmit manually with a specific system prompt context
     const event = {
       preventDefault: () => {},
-    } as React.FormEvent<HTMLFormElement> 
+    } as React.FormEvent
     
     handleSubmit(event, {
       data: {
