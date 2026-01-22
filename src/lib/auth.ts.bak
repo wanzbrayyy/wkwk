@@ -29,17 +29,9 @@ export const authOptions: AuthOptions = {
       return session
     },
     async jwt({ token, user }) {
-      // PERBAIKAN: Pastikan token.email ada sebelum melakukan query
-      if (!token.email) {
-        if (user) {
-          token.id = user.id
-        }
-        return token
-      }
-
       const dbUser = await db.user.findFirst({
         where: {
-          email: token.email, // Sekarang TypeScript tahu token.email adalah string
+          email: token.email,
         },
       })
 
