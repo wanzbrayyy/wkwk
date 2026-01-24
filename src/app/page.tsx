@@ -1,7 +1,16 @@
 import Link from "next/link"
 import { ArrowRight, Code2, Sparkles, Zap } from "lucide-react"
+import { getServerSession } from "next-auth" // Import getServerSession
+import { authOptions } from "@/lib/auth" // Import authOptions
+import { redirect } from "next/navigation"
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // Cek sesi. Jika user sudah login, arahkan ke dashboard.
+  const session = await getServerSession(authOptions)
+  if (session) {
+    redirect("/dashboard")
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="px-4 lg:px-6 h-16 flex items-center border-b border-border/40 backdrop-blur-sm fixed w-full z-50 bg-background/80">
@@ -12,10 +21,10 @@ export default function LandingPage() {
           <span className="font-bold text-xl tracking-tight">AutoCode.ai</span>
         </div>
         <nav className="ml-auto flex gap-4 sm:gap-6">
-          <Link href="/api/auth/signin" className="text-sm font-medium hover:text-primary transition-colors">
+          <Link href="/auth" className="text-sm font-medium hover:text-primary transition-colors">
             Sign In
           </Link>
-          <Link href="/api/auth/signin" className="text-sm font-medium bg-gradient-brand text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity">
+          <Link href="/auth" className="text-sm font-medium bg-gradient-brand text-white px-4 py-2 rounded-md hover:opacity-90 transition-opacity">
             Get Started
           </Link>
         </nav>
@@ -43,7 +52,7 @@ export default function LandingPage() {
               
               <div className="flex flex-col sm:flex-row gap-4 min-w-[300px] justify-center">
                 <Link 
-                  href="/dashboard"
+                  href="/auth" // Arahkan ke halaman auth
                   className="inline-flex h-12 items-center justify-center rounded-md bg-gradient-brand px-8 text-sm font-medium text-white shadow transition-all hover:opacity-90 hover:scale-105 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   Start Building Free
@@ -95,7 +104,7 @@ export default function LandingPage() {
 
       <footer className="py-6 w-full shrink-0 items-center px-4 md:px-6 border-t border-border">
         <p className="text-xs text-muted-foreground text-center">
-          ©  AutoCode.ai. All rights reserved.
+          © 2024 AutoCode.ai. All rights reserved.
         </p>
       </footer>
     </div>
