@@ -1,15 +1,23 @@
 "use client"
 
-import { useCodeGeneration } from "@/hooks/use-code-generation"
 import {
   ArrowLeft, Play, Save, Download, FileCode2,
-  Settings, Bot, Search, Plus, X, Code2
+  Settings, Bot, Search, Plus, X, Code2, PanelLeftClose, PanelRightClose
 } from "lucide-react"
 import Link from "next/link"
 import { ChatInterface } from "@/components/chat/chat-interface"
 import { Message } from "ai"
 import { Project, File, Message as PrismaMessage } from "@prisma/client"
 import { useRouter } from "next/navigation"
+import { useEditorStore } from "@/hooks/use-editor-store"
+import { useCodeGeneration } from "@/hooks/use-code-generation"
+import { FileExplorer } from "@/components/editor/file-explorer"
+import { CodeView } from "@/components/editor/code-view"
+import { Terminal } from "@/components/editor/terminal"
+import { PreviewPane } from "@/components/editor/preview-pane"
+import { toast } from "sonner"
+import { useEffect, useState } from "react"
+import { mapPrismaRoleToAiRole } from "@/lib/parser"
 
 interface ProjectWithDetails extends Project {
   files: File[];
@@ -22,15 +30,28 @@ interface ClientEditorPageProps {
 
 export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
   const project: ProjectWithDetails = JSON.parse(projectData)
+  const router = useRouter()
 
-  // Filter pesan dari Prisma agar hanya memiliki role yang valid untuk AI SDK
-  const filteredInitialMessages: Message[] = project.messages
-    .filter(msg => ["user", "assistant", "system"].includes(msg.role)) // Filter role yang valid
+  const {
+    files,
+    activeFileId,
+    openFiles,
+    fileContents,
+    setFiles,
+    setActiveFile,
+    openFile,
+    closeFile,
+    updateFileContent,
+    getFileContent,
+  } = useEditorStore()
+
+  const initialMessages: Message[] = project.messages
+    .filter(msg => ["user", "assistant", "system"].includes(msg.role))
     .map(msg => ({
       id: msg.id,
-      role: msg.role === "user" ? "user" : (msg.role === "assistant" ? "assistant" : "system"), // Pastikan tipe role
+      role: mapPrismaRoleToAiRole(msg.role),
       content: msg.content,
-    })) as Message[] // Type assertion karena kita sudah filter
+    })) as Message[]
 
   const {
     messages,
@@ -40,107 +61,260 @@ export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
     isLoading,
   } = useCodeGeneration({
     projectId: project.id,
-    initialMessages: filteredInitialMessages // Gunakan pesan yang sudah difilter
+    initialMessages: initialMessages
   })
 
-  const router = useRouter()
+  const [showExplorer, setShowExplorer] = useState(true)
+  const [showChat, setShowChat] = useState(true)
+  const [showPreview, setShowPreview] = useState(false) // Start with preview hidden
+
+  // Initialize editor store with project files from server
+  useEffect(() => {
+    if (project && project.files.length > 0 && files.length === 0) {
+      const initialFileNodes = project.files.map(f => ({
+        id: f.id,
+        name: f.name,
+        type: "file",
+        path: f.path,
+        content: f.content,
+        language: f.language,
+      }));
+
+      // A simple conversion to nested tree structure (can be improved)
+      const buildFileTree = (flatFiles: typeof initialFileNodes): FileNode[] => {
+        const tree: FileNode[] = [];
+        const pathMap: { [key: string]: FileNode } = {};
+
+        flatFiles.forEach(file => {
+          const parts = file.path.split('/');
+          let currentPath = '';
+          let currentNode: FileNode[] = tree;
+
+          parts.forEach((part, index) => {
+            currentPath = currentPath ? `${currentPath}/${part}` : part;
+            const isFile = index === parts.length - 1;
+
+            if (!pathMap[currentPath]) {
+              const newNode: FileNode = {
+                id: isFile ? file.id : Math.random().toString(36).substring(2, 9),
+                name: part,
+                type: isFile ? "file" : "folder",
+                path: currentPath,
+                children: isFile ? undefined : [],
+                content: isFile ? file.content : undefined,
+                language: isFile ? file.language : undefined,
+              };
+              currentNode.push(newNode);
+              pathMap[currentPath] = newNode;
+            }
+
+            if (!isFile) {
+              currentNode = pathMap[currentPath].children!;
+            }
+          });
+        });
+
+        // Simple sorting for top-level
+        tree.sort((a, b) => {
+          if (a.type === "folder" && b.type === "file") return -1;
+          if (a.type === "file" && b.type === "folder") return 1;
+          return a.name.localeCompare(b.name);
+        });
+
+        return tree;
+      };
+
+      setFiles(buildFileTree(initialFileNodes));
+      // Optionally open the first file or a default file
+      if (project.files.length > 0) {
+        openFile(project.files[0].path, project.files[0].content);
+        setActiveFile(project.files[0].path);
+      }
+    }
+  }, [project, files.length, setFiles, openFile, setActiveFile]);
+
+  const handleSaveFile = async () => {
+    if (!activeFileId) {
+      toast.info("No active file to save.");
+      return;
+    }
+    const contentToSave = getFileContent(activeFileId);
+    if (contentToSave === undefined) {
+      toast.error("File content not found.");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/files", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          projectId: project.id,
+          path: activeFileId,
+          content: contentToSave,
+          language: files.find(f => f.path === activeFileId)?.language || "plaintext"
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save file.");
+      }
+      toast.success(`File '${activeFileId}' saved!`);
+      // You might want to update a 'isDirty' state here
+    } catch (error: any) {
+      toast.error(error.message || "Error saving file.");
+    }
+  };
+
+  const handleRunProject = () => {
+    // Implement actual run logic (e.g., trigger a build, open a preview URL)
+    setShowPreview(true); // For now, just show the preview pane
+    toast.info("Project run initiated (showing preview).");
+  };
+
+  const handleSelectFile = (path: string) => {
+    const fileNode = project.files.find(f => f.path === path);
+    if (fileNode) {
+      openFile(fileNode.path, fileNode.content);
+      setActiveFile(fileNode.path);
+    } else {
+      // If file not from initial project data, might be newly generated or just path
+      const content = getFileContent(path);
+      openFile(path, content);
+      setActiveFile(path);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-[#1e1e1e]">
+      {/* Header */}
       <header className="h-14 border-b border-[#333] bg-[#1e1e1e] flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="p-2 hover:bg-[#2d2d2d] rounded-md transition-colors text-[#708F96]">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3">
             <div className="h-8 w-8 rounded bg-gradient-brand flex items-center justify-center">
                <span className="font-bold text-white text-xs">AC</span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-[#e0e0e0]">{project.name}</span>
-              <span className="text-[10px] text-[#AA895F]">Editing mode</span>
-            </div>
+            <span className="text-sm font-medium text-[#e0e0e0]">{project.name}</span>
+            <span className="text-[10px] text-[#AA895F] hidden sm:block">Editing mode</span>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-[#252526] rounded-md border border-[#333] px-2 py-1 mr-4">
+          <div className="hidden sm:flex items-center bg-[#252526] rounded-md border border-[#333] px-2 py-1 mr-4">
             <div className="w-2 h-2 rounded-full bg-[#AA895F] animate-pulse mr-2"></div>
             <span className="text-xs text-muted-foreground">AI Ready</span>
           </div>
 
-          <button className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[#e0e0e0] hover:bg-[#2d2d2d] rounded-md transition-colors border border-[#333]">
+          <button
+            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-[#e0e0e0] hover:bg-[#2d2d2d] rounded-md transition-colors border border-[#333]"
+            onClick={handleSaveFile}
+          >
             <Save className="h-3.5 w-3.5" />
             Save
           </button>
-          <button className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-gradient-brand text-white hover:opacity-90 rounded-md transition-all shadow-lg shadow-[#708F96]/10">
+          <button
+            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-gradient-brand text-white hover:opacity-90 rounded-md transition-all shadow-lg shadow-[#708F96]/10"
+            onClick={handleRunProject}
+          >
             <Play className="h-3.5 w-3.5 fill-current" />
             Run Project
           </button>
-          <button className="p-2 text-[#708F96] hover:bg-[#2d2d2d] rounded-md transition-colors">
+          <button className="p-2 text-[#708F96] hover:bg-[#2d2d2d] rounded-md transition-colors hidden md:block">
             <Settings className="h-4 w-4" />
           </button>
         </div>
       </header>
 
+      {/* Main Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        <aside className="w-64 border-r border-[#333] bg-[#252526] flex flex-col">
-          <div className="p-3 border-b border-[#333] flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#858585] uppercase tracking-wider">Explorer</span>
-            <div className="flex gap-1">
-              <button className="p-1 hover:bg-[#333] rounded"><Plus className="h-3 w-3 text-[#cccccc]" /></button>
-              <button className="p-1 hover:bg-[#333] rounded"><Search className="h-3 w-3 text-[#cccccc]" /></button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto py-2">
-            {project.files.length === 0 ? (
-              <div className="text-xs text-[#858585] p-4 text-center">
-                Project is empty.
-              </div>
-            ) : (
-              <div className="flex flex-col">
-                {project.files.map((file) => (
-                  <div
-                    key={file.id}
-                    className="flex items-center gap-2 px-4 py-1.5 text-sm text-[#cccccc] hover:bg-[#2a2d2e] cursor-pointer transition-colors border-l-2 border-transparent hover:border-[#708F96]"
-                  >
-                    <FileCode2 className="h-4 w-4 text-[#708F96]" />
-                    <span className="truncate">{file.path.split('/').pop()}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        {/* Toggle Explorer Button (Mobile/Tablet) */}
+        <button
+          className="absolute left-0 top-1/2 -translate-y-1/2 bg-[#252526] text-[#e0e0e0] p-1.5 rounded-r-md z-20 md:hidden border-r border-t border-b border-[#333]"
+          onClick={() => setShowExplorer(!showExplorer)}
+        >
+          {showExplorer ? <PanelLeftClose className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4 rotate-180" />}
+        </button>
+
+        {/* Sidebar: File Explorer */}
+        <aside className={`${showExplorer ? 'translate-x-0' : '-translate-x-full'} absolute md:relative inset-y-0 left-0 w-64 md:w-64 border-r border-[#333] bg-[#252526] flex flex-col z-10 transition-transform duration-200 ease-in-out`}>
+          <FileExplorer
+            files={files}
+            activeFileId={activeFileId}
+            onSelectFile={handleSelectFile}
+          />
         </aside>
 
-        <main className="flex-1 flex flex-col bg-[#1e1e1e] relative">
-          <div className="flex border-b border-[#333] bg-[#252526] overflow-x-auto">
-             <div className="flex items-center gap-2 px-4 py-2 border-t-2 border-[#AA895F] bg-[#1e1e1e] text-[#e0e0e0] text-sm min-w-[120px]">
-                <FileCode2 className="h-3 w-3 text-[#AA895F]" />
-                <span className="truncate">page.tsx</span>
-                <X className="h-3 w-3 ml-auto hover:text-white cursor-pointer" />
-             </div>
-             <div className="flex items-center gap-2 px-4 py-2 border-t-2 border-transparent text-[#858585] hover:bg-[#2a2d2e] text-sm min-w-[120px] cursor-pointer">
-                <FileCode2 className="h-3 w-3" />
-                <span className="truncate">layout.tsx</span>
-             </div>
-          </div>
-
-          <div className="flex-1 p-4 font-mono text-sm text-[#d4d4d4] overflow-auto">
-            <div className="flex items-center justify-center h-full flex-col gap-4 opacity-50">
-               <Code2 className="h-16 w-16 text-[#333]" />
-               <p className="text-[#858585]">Select a file to start editing</p>
-            </div>
-          </div>
+        {/* Editor Area */}
+        <main className="flex-1 flex flex-col bg-[#1e1e1e] relative min-w-0">
+          <CodeView
+            files={openFiles.map(path => ({
+              path,
+              content: getFileContent(path),
+              language: files.find(f => f.path === path)?.language || "plaintext"
+            }))}
+            activeFile={activeFileId}
+            onCloseFile={(path) => closeFile(path)}
+            onSelectFile={handleSelectFile}
+            onCodeChange={(content) => {
+              if (activeFileId) updateFileContent(activeFileId, content);
+            }}
+          />
+          <Terminal />
         </main>
 
-        <ChatInterface
-          messages={messages}
-          input={input}
-          handleInputChange={handleInputChange}
-          onSubmit={handleSubmit}
-          isLoading={isLoading}
-        />
+        {/* Toggle Chat/Preview Buttons (Mobile/Tablet) */}
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20 md:hidden">
+          <button
+            className="bg-[#252526] text-[#e0e0e0] p-1.5 rounded-l-md border-l border-t border-b border-[#333]"
+            onClick={() => { setShowChat(!showChat); setShowPreview(false); }}
+          >
+            {showChat ? <PanelRightClose className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4 rotate-180" />}
+          </button>
+          <button
+            className="bg-[#252526] text-[#e0e0e0] p-1.5 rounded-l-md border-l border-t border-b border-[#333]"
+            onClick={() => { setShowPreview(!showPreview); setShowChat(false); }}
+          >
+            {showPreview ? <PanelRightClose className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </button>
+        </div>
+
+
+        {/* AI Sidebar / Preview Pane */}
+        {(showChat || showPreview) && (
+          <div className="absolute md:relative inset-y-0 right-0 w-full md:w-80 flex-shrink-0 z-10 bg-[#1e1e1e] transition-transform duration-200 ease-in-out">
+            {showPreview ? (
+              <PreviewPane />
+            ) : (
+              <ChatInterface
+                messages={messages}
+                input={input}
+                handleInputChange={handleInputChange}
+                onSubmit={handleSubmit}
+                isLoading={isLoading}
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Footer Status Bar */}
+      <div className="h-6 bg-[#708F96] text-white flex items-center justify-between px-3 text-xs select-none shrink-0">
+        <div className="flex items-center gap-3">
+           <span className="font-bold">main*</span>
+           <span>0 errors</span>
+        </div>
+        <div className="flex items-center gap-3">
+           <button onClick={() => setShowPreview(!showPreview)} className="hover:text-[#e0e0e0] flex items-center gap-1">
+             {showPreview ? <PanelRightClose className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+             {showPreview ? "Hide Preview" : "Show Preview"}
+           </button>
+           <span>TypeScript React</span>
+        </div>
       </div>
     </div>
   )

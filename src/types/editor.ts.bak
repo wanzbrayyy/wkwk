@@ -5,7 +5,9 @@ export interface FileNode {
   path: string
   content?: string
   language?: string
+  parentId?: string
   children?: FileNode[]
+  depth?: number
 }
 
 export interface EditorTab {

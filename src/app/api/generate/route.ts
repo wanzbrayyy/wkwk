@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { openai } from "@/lib/ai/openai"
+import { SYSTEM_PROMPT } from "@/lib/ai/prompts" // Import SYSTEM_PROMPT
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions)
@@ -23,7 +24,6 @@ export async function POST(req: Request) {
 
   const lastMessage = messages[messages.length - 1]
   
-  // Simpan pesan user ke DB
   await db.message.create({
     data: {
       role: "user",
@@ -32,23 +32,20 @@ export async function POST(req: Request) {
     }
   })
 
-  // Panggil OpenRouter (Deepseek)
   const response = await openai.chat.completions.create({
     model: "tngtech/deepseek-r1t2-chimera:free",
     stream: true,
     messages: [
       {
         role: "system",
-        content: "You are an expert full-stack developer. You write clean, production-ready code. formatting it properly."
+        content: SYSTEM_PROMPT // Gunakan SYSTEM_PROMPT yang diperbarui
       },
       ...messages
     ]
   })
 
-  // PERBAIKAN: Gunakan 'as any' pada response untuk mengatasi error TypeScript
   const stream = OpenAIStream(response as any, {
     onCompletion: async (completion) => {
-      // Simpan balasan AI ke DB setelah stream selesai
       await db.message.create({
         data: {
           role: "assistant",
@@ -56,6 +53,9 @@ export async function POST(req: Request) {
           projectId: projectId
         }
       })
+    },
+    experimental_onFunctionCall: async ({ name, arguments: args }, create  ) => {
+      // Future function call implementation could go here
     }
   })
 

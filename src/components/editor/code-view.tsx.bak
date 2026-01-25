@@ -3,47 +3,49 @@
 import { X } from "lucide-react"
 import { MonacoEditor } from "./monaco-editor"
 import { cn } from "@/lib/utils"
-import { useEditorStore } from "@/hooks/use-editor-store" // Import useEditorStore
+
+interface OpenFile {
+  path: string
+  content: string
+  language: string
+}
 
 interface CodeViewProps {
+  files: OpenFile[]
+  activeFile: string | null
   onCloseFile: (path: string) => void
   onSelectFile: (path: string) => void
-  onCodeChange: (content: string) => void
+  onCodeChange: (value: string) => void
 }
 
 export function CodeView({ 
+  files, 
+  activeFile, 
   onCloseFile, 
   onSelectFile,
   onCodeChange 
 }: CodeViewProps) {
-  const { openFiles, activeFileId, getFileContent } = useEditorStore();
-
-  const activeFileObj = activeFileId ? {
-    path: activeFileId,
-    content: getFileContent(activeFileId),
-    // Dummy language, should come from file node
-    language: openFiles.find(path => path === activeFileId)?.split('.').pop() || 'typescript' 
-  } : null;
+  const activeFileObj = files.find(f => f.path === activeFile)
 
   return (
     <div className="flex h-full w-full flex-col bg-[#1e1e1e]">
       <div className="flex border-b border-[#333] bg-[#252526] overflow-x-auto no-scrollbar">
-        {openFiles.map((path) => (
+        {files.map((file) => (
           <div
-            key={path}
-            onClick={() => onSelectFile(path)}
+            key={file.path}
+            onClick={() => onSelectFile(file.path)}
             className={cn(
               "group flex items-center gap-2 px-3 py-2 text-sm min-w-[120px] max-w-[200px] border-r border-[#333] cursor-pointer select-none",
-              activeFileId === path
+              activeFile === file.path
                 ? "bg-[#1e1e1e] text-[#e0e0e0] border-t-2 border-t-[#708F96]"
                 : "bg-[#2d2d2d] text-[#858585] border-t-2 border-t-transparent hover:bg-[#333]"
             )}
           >
-            <span className="truncate flex-1">{path.split('/').pop()}</span>
+            <span className="truncate flex-1">{file.path.split('/').pop()}</span>
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                onCloseFile(path)
+                onCloseFile(file.path)
               }}
               className="opacity-0 group-hover:opacity-100 hover:bg-[#444] rounded p-0.5"
             >
