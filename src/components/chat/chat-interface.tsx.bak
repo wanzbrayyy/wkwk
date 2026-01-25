@@ -4,18 +4,15 @@ import { useRef, useEffect, FormEvent } from "react"
 import { MessageBubble } from "./message-bubble"
 import { PromptInput } from "./prompt-input"
 import { Bot, Sparkles } from "lucide-react"
-import { Message } from "ai" // Import Message type dari ai
+import { Message } from "ai"
 
 interface ChatInterfaceProps {
-  messages: Message[] // Ini adalah array dari ai SDK, memiliki role yang lebih luas
+  messages: Message[]
   isLoading: boolean
   input: string
   handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
   onSubmit: (e: FormEvent<HTMLFormElement>) => void
 }
-
-// Definisikan tipe role yang valid untuk MessageBubble
-type ValidMessageRole = "user" | "assistant" | "system"
 
 export function ChatInterface({ messages, isLoading, input, handleInputChange, onSubmit }: ChatInterfaceProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -23,12 +20,6 @@ export function ChatInterface({ messages, isLoading, input, handleInputChange, o
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
-
-  // Filter pesan agar hanya menyertakan role yang valid untuk MessageBubble
-  const displayableMessages = messages.filter(
-    (msg): msg is Message & { role: ValidMessageRole } =>
-      msg.role === "user" || msg.role === "assistant" || msg.role === "system"
-  );
 
   return (
     <div className="flex h-full w-80 shrink-0 flex-col bg-[#1e1e1e] border-l border-[#333]">
@@ -43,7 +34,7 @@ export function ChatInterface({ messages, isLoading, input, handleInputChange, o
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
-        {displayableMessages.length === 0 && !isLoading ? ( // Tampilkan placeholder jika tidak ada pesan dan tidak loading
+        {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center space-y-4 opacity-50">
             <div className="rounded-full bg-[#333] p-4">
               <Sparkles className="h-8 w-8 text-[#708F96]" />
@@ -56,10 +47,10 @@ export function ChatInterface({ messages, isLoading, input, handleInputChange, o
             </div>
           </div>
         ) : (
-          displayableMessages.map((msg) => (
+          messages.map((msg) => (
             <MessageBubble
               key={msg.id}
-              role={msg.role} // Sekarang role dijamin valid
+              role={msg.role}
               content={msg.content}
             />
           ))
