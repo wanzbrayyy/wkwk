@@ -7,48 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// NextAuth.js required models
-model Account {
-  id                String  @id @default(auto()) @map("_id") @db.ObjectId
-  userId            String  @db.ObjectId
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.String
-  access_token      String? @db.String
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.String
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  sessionToken String   @unique
-  userId       String   @db.ObjectId
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
 model User {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
   name          String?
-  email         String?   @unique // Diubah menjadi String? karena email bisa null atau tidak verified dari OAuth
+  email         String    @unique
   emailVerified DateTime?
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  accounts      Account[] // Hubungan dengan Account
-  sessions      Session[] // Hubungan dengan Session
   projects      Project[]
 }
 
-// Your existing models
 model Project {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
   name        String
