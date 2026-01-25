@@ -9,7 +9,7 @@ import { ChatInterface } from "@/components/chat/chat-interface"
 import { Message } from "ai"
 import { Project, File, Message as PrismaMessage } from "@prisma/client"
 import { useRouter } from "next/navigation"
-import { useEditorStore, FileNode } from "@/hooks/use-editor-store" // <-- PERBAIKAN DI SINI: Tambahkan FileNode
+import { useEditorStore, FileNode } from "@/hooks/use-editor-store"
 import { useCodeGeneration } from "@/hooks/use-code-generation"
 import { FileExplorer } from "@/components/editor/file-explorer"
 import { CodeView } from "@/components/editor/code-view"
@@ -33,7 +33,7 @@ export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
   const router = useRouter()
 
   const {
-    files,
+    files, // tetap ada di sini untuk logika initialization
     activeFileId,
     openFiles,
     fileContents,
@@ -68,7 +68,6 @@ export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
   const [showChat, setShowChat] = useState(true)
   const [showPreview, setShowPreview] = useState(false)
 
-  // Initialize editor store with project files from server
   useEffect(() => {
     if (project && project.files.length > 0 && files.length === 0) {
       const initialFileNodes = project.files.map(f => ({
@@ -151,6 +150,7 @@ export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
           projectId: project.id,
           path: activeFileId,
           content: contentToSave,
+          // Get language from fileContents if available, or fall back to plaintext
           language: files.find(f => f.path === activeFileId)?.language || "plaintext"
         }),
       });
@@ -170,15 +170,21 @@ export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
   };
 
   const handleSelectFile = (path: string) => {
-    const fileNode = project.files.find(f => f.path === path);
-    if (fileNode) {
-      openFile(fileNode.path, fileNode.content);
-      setActiveFile(fileNode.path);
+    // Check if the file is already in the opened files
+    const existingContent = getFileContent(path);
+    if (existingContent !== "") {
+      openFile(path, existingContent);
     } else {
-      const content = getFileContent(path);
-      openFile(path, content);
-      setActiveFile(path);
+      // Find the file from initial project data or newly generated
+      const fileNode = project.files.find(f => f.path === path) || files.find(f => f.path === path && f.type === "file");
+      if (fileNode?.content) {
+        openFile(fileNode.path, fileNode.content);
+      } else {
+        // If still no content, open with empty string
+        openFile(path, "");
+      }
     }
+    setActiveFile(path);
   };
 
   return (
@@ -233,20 +239,12 @@ export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
 
         <aside className={`${showExplorer ? 'translate-x-0' : '-translate-x-full'} absolute md:relative inset-y-0 left-0 w-64 md:w-64 border-r border-[#333] bg-[#252526] flex flex-col z-10 transition-transform duration-200 ease-in-out`}>
           <FileExplorer
-            files={files}
-            activeFileId={activeFileId}
-            onSelectFile={handleSelectFile}
+            onSelectFile={handleSelectFile} // Sekarang FileExplorer mengambil files dan activeFileId dari store-nya sendiri
           />
         </aside>
 
         <main className="flex-1 flex flex-col bg-[#1e1e1e] relative min-w-0">
           <CodeView
-            files={openFiles.map(path => ({
-              path,
-              content: getFileContent(path),
-              language: files.find(f => f.path === path)?.language || "plaintext"
-            }))}
-            activeFile={activeFileId}
             onCloseFile={(path) => closeFile(path)}
             onSelectFile={handleSelectFile}
             onCodeChange={(content) => {
