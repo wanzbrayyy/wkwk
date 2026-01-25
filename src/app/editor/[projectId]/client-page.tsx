@@ -33,7 +33,7 @@ export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
   const router = useRouter()
 
   const {
-    files, // tetap ada di sini untuk logika initialization
+    files, 
     activeFileId,
     openFiles,
     fileContents,
@@ -150,7 +150,6 @@ export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
           projectId: project.id,
           path: activeFileId,
           content: contentToSave,
-          // Get language from fileContents if available, or fall back to plaintext
           language: files.find(f => f.path === activeFileId)?.language || "plaintext"
         }),
       });
@@ -170,17 +169,14 @@ export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
   };
 
   const handleSelectFile = (path: string) => {
-    // Check if the file is already in the opened files
     const existingContent = getFileContent(path);
     if (existingContent !== "") {
       openFile(path, existingContent);
     } else {
-      // Find the file from initial project data or newly generated
       const fileNode = project.files.find(f => f.path === path) || files.find(f => f.path === path && f.type === "file");
       if (fileNode?.content) {
         openFile(fileNode.path, fileNode.content);
       } else {
-        // If still no content, open with empty string
         openFile(path, "");
       }
     }
@@ -239,7 +235,8 @@ export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
 
         <aside className={`${showExplorer ? 'translate-x-0' : '-translate-x-full'} absolute md:relative inset-y-0 left-0 w-64 md:w-64 border-r border-[#333] bg-[#252526] flex flex-col z-10 transition-transform duration-200 ease-in-out`}>
           <FileExplorer
-            onSelectFile={handleSelectFile} // Sekarang FileExplorer mengambil files dan activeFileId dari store-nya sendiri
+            // PERBAIKAN: Hapus prop files dan activeFileId di sini
+            onSelectFile={handleSelectFile} 
           />
         </aside>
 
