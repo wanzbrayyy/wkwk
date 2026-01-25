@@ -2,12 +2,12 @@ import { useChat } from "ai/react"
 import { toast } from "sonner"
 import { useEditorStore } from "./use-editor-store"
 import React from "react"
-import { parseAiFileResponse, mapPrismaRoleToAiRole } from "@/lib/parser" // Import parser
-import { Message } from "ai" // Import Message type dari ai
+import { parseAiFileResponse, mapPrismaRoleToAiRole } from "@/lib/parser"
+import { Message } from "ai"
 
 interface UseCodeGenerationProps {
   projectId: string
-  initialMessages?: Message[] // Menggunakan Message dari 'ai'
+  initialMessages?: Message[]
 }
 
 export function useCodeGeneration({ projectId, initialMessages = [] }: UseCodeGenerationProps) {
@@ -39,13 +39,16 @@ export function useCodeGeneration({ projectId, initialMessages = [] }: UseCodeGe
         if (aiResponse && aiResponse.files.length > 0) {
           addGeneratedFiles(aiResponse.files);
           if (aiResponse.files.length > 0) {
-            openFile(aiResponse.files[aiResponse.files.length - 1].path, aiResponse.files[aiResponse.files.length - 1].content);
-            setActiveFile(aiResponse.files[aiResponse.files.length - 1].path);
+            // Open the first generated file, or the last one if multiple
+            openFile(aiResponse.files.path, aiResponse.files.content);
+            setActiveFile(aiResponse.files.path);
           }
           toast.success(aiResponse.message || "Code generated and added to files.");
         } else {
-          // If it's not a structured file response, just show it in chat
-          toast("AI Response", { description: "AI responded in plain text or unrecognized format." });
+          // If it's not a structured file response, just show it in chat and notify
+          if (message.content.trim().length > 0) {
+            toast("AI Response", { description: "AI responded in plain text or unrecognized format." });
+          }
         }
       }
     },
@@ -55,11 +58,13 @@ export function useCodeGeneration({ projectId, initialMessages = [] }: UseCodeGe
   })
 
   const generateCodeForActiveFile = async (instruction: string) => {
-    if (!activeFileId) { // activeFileId is not available directly here, needs to be passed or accessed via store
-      toast.error("No file selected")
-      return
+    // This function can be used to manually trigger code generation outside of chat submit
+    // For now, it's not directly used by the current UI flow, but kept for future expansion.
+    if (!instruction.trim()) {
+      toast.error("Please provide an instruction for code generation.");
+      return;
     }
-    
+
     const event = {
       preventDefault: () => {},
     } as React.FormEvent<HTMLFormElement> 
@@ -67,7 +72,6 @@ export function useCodeGeneration({ projectId, initialMessages = [] }: UseCodeGe
     handleSubmit(event, {
       data: {
         instruction,
-        // targetFile: activeFileId // No longer needed directly for AI file generation
       }
     })
   }
@@ -82,76 +86,5 @@ export function useCodeGeneration({ projectId, initialMessages = [] }: UseCodeGe
     reload,
     generateCodeForActiveFile,
     setMessages
-  }
-}```
-
-### 6. FILE BARU: `src/app/api/files/route.ts` (API untuk Menyimpan File)
-
-```typescript
-import { getServerSession } from "next-auth"
-import { NextResponse } from "next/server"
-import { authOptions } from "@/lib/auth"
-import { db } from "@/lib/db"
-
-export async function POST(req: Request) {
-  try {
-    const session = await getServerSession(authOptions)
-
-    if (!session?.user?.email) {
-      return new NextResponse("Unauthorized", { status: 401 })
-    }
-
-    const { projectId, path, content, language } = await req.json()
-
-    if (!projectId || !path || content === undefined) {
-      return new NextResponse("Missing required fields", { status: 400 })
-    }
-
-    const user = await db.user.findUnique({
-      where: { email: session.user.email }
-    })
-
-    if (!user) {
-      return new NextResponse("User not found", { status: 404 })
-    }
-
-    // Find the project to ensure user owns it
-    const project = await db.project.findUnique({
-      where: {
-        id: projectId,
-        userId: user.id,
-      }
-    })
-
-    if (!project) {
-      return new NextResponse("Project not found or unauthorized", { status: 404 })
-    }
-
-    // Upsert the file (create if not exists, update if exists)
-    const file = await db.file.upsert({
-      where: {
-        projectId_path: { // Unique constraint defined in schema.prisma
-          projectId: projectId,
-          path: path,
-        },
-      },
-      update: {
-        content: content,
-        language: language || "plaintext", // Update language if provided
-        updatedAt: new Date(),
-      },
-      create: {
-        projectId: projectId,
-        path: path,
-        name: path.split('/').pop() || path,
-        content: content,
-        language: language || "plaintext",
-      },
-    })
-
-    return NextResponse.json(file)
-  } catch (error) {
-    console.error("[API_FILES_POST_ERROR]", error)
-    return new NextResponse("Internal Error", { status: 500 })
   }
 }
