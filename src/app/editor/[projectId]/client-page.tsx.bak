@@ -8,9 +8,10 @@ import {
 import Link from "next/link"
 import { ChatInterface } from "@/components/chat/chat-interface"
 import { Message } from "ai"
-import { Project, File, Message as PrismaMessage } from "@prisma/client"
+import { Project, File, Message as PrismaMessage } from "@prisma/client" // Import Prisma types
 import { useRouter } from "next/navigation"
 
+// Extend Project type for includes
 interface ProjectWithDetails extends Project {
   files: File[];
   messages: PrismaMessage[];
@@ -23,14 +24,11 @@ interface ClientEditorPageProps {
 export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
   const project: ProjectWithDetails = JSON.parse(projectData)
 
-  // Filter pesan dari Prisma agar hanya memiliki role yang valid untuk AI SDK
-  const filteredInitialMessages: Message[] = project.messages
-    .filter(msg => ["user", "assistant", "system"].includes(msg.role)) // Filter role yang valid
-    .map(msg => ({
-      id: msg.id,
-      role: msg.role === "user" ? "user" : (msg.role === "assistant" ? "assistant" : "system"), // Pastikan tipe role
-      content: msg.content,
-    })) as Message[] // Type assertion karena kita sudah filter
+  const initialMessages: Message[] = project.messages.map(msg => ({
+    id: msg.id,
+    role: msg.role === "user" ? "user" : "assistant",
+    content: msg.content,
+  }))
 
   const {
     messages,
@@ -40,10 +38,10 @@ export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
     isLoading,
   } = useCodeGeneration({
     projectId: project.id,
-    initialMessages: filteredInitialMessages // Gunakan pesan yang sudah difilter
+    initialMessages: initialMessages
   })
 
-  const router = useRouter()
+  const router = useRouter() // Use client-side router for navigation
 
   return (
     <div className="flex flex-col h-full bg-[#1e1e1e]">
