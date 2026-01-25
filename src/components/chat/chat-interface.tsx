@@ -1,24 +1,20 @@
 "use client"
 
-import { useRef, useEffect } from "react"
+import { useRef, useEffect, FormEvent } from "react"
 import { MessageBubble } from "./message-bubble"
 import { PromptInput } from "./prompt-input"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Bot, Sparkles } from "lucide-react"
-
-interface Message {
-  id: string
-  role: "user" | "assistant"
-  content: string
-}
+import { Message } from "ai"
 
 interface ChatInterfaceProps {
   messages: Message[]
   isLoading: boolean
-  onSendMessage: (message: string) => void
+  input: string
+  handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
+  onSubmit: (e: FormEvent<HTMLFormElement>) => void
 }
 
-export function ChatInterface({ messages, isLoading, onSendMessage }: ChatInterfaceProps) {
+export function ChatInterface({ messages, isLoading, input, handleInputChange, onSubmit }: ChatInterfaceProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -26,7 +22,7 @@ export function ChatInterface({ messages, isLoading, onSendMessage }: ChatInterf
   }, [messages])
 
   return (
-    <div className="flex h-full flex-col bg-[#1e1e1e] border-l border-[#333]">
+    <div className="flex h-full w-80 shrink-0 flex-col bg-[#1e1e1e] border-l border-[#333]">
       <div className="flex items-center gap-2 border-b border-[#333] p-4 shadow-sm z-10">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#708F96] to-[#AA895F]">
           <Bot className="h-5 w-5 text-white" />
@@ -52,17 +48,36 @@ export function ChatInterface({ messages, isLoading, onSendMessage }: ChatInterf
           </div>
         ) : (
           messages.map((msg) => (
-            <MessageBubble 
-              key={msg.id} 
-              role={msg.role} 
-              content={msg.content} 
+            <MessageBubble
+              key={msg.id}
+              role={msg.role}
+              content={msg.content}
             />
           ))
+        )}
+        {isLoading && (
+          <div className="flex w-full gap-3 p-4 text-sm mb-2 rounded-lg bg-transparent">
+            <div className="flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-md border border-[#AA895F]/30 bg-[#AA895F]/10 text-[#AA895F]">
+              <Bot className="h-4 w-4" />
+            </div>
+            <div className="flex-1 space-y-2 overflow-hidden">
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 rounded-full bg-[#AA895F] animate-bounce-slow" style={{ animationDelay: '0s' }}></div>
+                <div className="h-2 w-2 rounded-full bg-[#AA895F] animate-bounce-slow" style={{ animationDelay: '0.2s' }}></div>
+                <div className="h-2 w-2 rounded-full bg-[#AA895F] animate-bounce-slow" style={{ animationDelay: '0.4s' }}></div>
+              </div>
+            </div>
+          </div>
         )}
         <div ref={bottomRef} />
       </div>
 
-      <PromptInput onSubmit={onSendMessage} isLoading={isLoading} />
+      <PromptInput
+        input={input}
+        handleInputChange={handleInputChange}
+        onSubmit={onSubmit}
+        isLoading={isLoading}
+      />
     </div>
   )
 }

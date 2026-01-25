@@ -1,45 +1,50 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
-import { db } from "@/lib/db"
-import { redirect, notFound } from "next/navigation"
-import { 
-  ArrowLeft, Play, Save, Download, FileCode2, 
-  Settings, Bot, Search, Plus, X 
+"use client"
+
+import { useCodeGeneration } from "@/hooks/use-code-generation"
+import {
+  ArrowLeft, Play, Save, Download, FileCode2,
+  Settings, Bot, Search, Plus, X, Code2
 } from "lucide-react"
 import Link from "next/link"
+import { ChatInterface } from "@/components/chat/chat-interface"
+import { Message } from "ai"
+import { Project, File, Message as PrismaMessage } from "@prisma/client" // Import Prisma types
+import { useRouter } from "next/navigation"
 
-interface EditorPageProps {
-  params: {
-    projectId: string
-  }
+// Extend Project type for includes
+interface ProjectWithDetails extends Project {
+  files: File[];
+  messages: PrismaMessage[];
 }
 
-export default async function EditorPage({ params }: EditorPageProps) {
-  const session = await getServerSession(authOptions)
-  
-  if (!session?.user?.email) {
-    redirect("/api/auth/signin")
-  }
+interface ClientEditorPageProps {
+  projectData: string
+}
 
-  const project = await db.project.findUnique({
-    where: {
-      id: params.projectId,
-      user: {
-        email: session.user.email
-      }
-    },
-    include: {
-      files: true
-    }
+export function ClientEditorPage({ projectData }: ClientEditorPageProps) {
+  const project: ProjectWithDetails = JSON.parse(projectData)
+
+  const initialMessages: Message[] = project.messages.map(msg => ({
+    id: msg.id,
+    role: msg.role === "user" ? "user" : "assistant",
+    content: msg.content,
+  }))
+
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+  } = useCodeGeneration({
+    projectId: project.id,
+    initialMessages: initialMessages
   })
 
-  if (!project) {
-    notFound()
-  }
+  const router = useRouter() // Use client-side router for navigation
 
   return (
     <div className="flex flex-col h-full bg-[#1e1e1e]">
-      {/* Header */}
       <header className="h-14 border-b border-[#333] bg-[#1e1e1e] flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="p-2 hover:bg-[#2d2d2d] rounded-md transition-colors text-[#708F96]">
@@ -76,10 +81,7 @@ export default async function EditorPage({ params }: EditorPageProps) {
         </div>
       </header>
 
-      {/* Main Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        
-        {/* Sidebar: File Explorer */}
         <aside className="w-64 border-r border-[#333] bg-[#252526] flex flex-col">
           <div className="p-3 border-b border-[#333] flex items-center justify-between">
             <span className="text-xs font-semibold text-[#858585] uppercase tracking-wider">Explorer</span>
@@ -96,8 +98,8 @@ export default async function EditorPage({ params }: EditorPageProps) {
             ) : (
               <div className="flex flex-col">
                 {project.files.map((file) => (
-                  <div 
-                    key={file.id} 
+                  <div
+                    key={file.id}
                     className="flex items-center gap-2 px-4 py-1.5 text-sm text-[#cccccc] hover:bg-[#2a2d2e] cursor-pointer transition-colors border-l-2 border-transparent hover:border-[#708F96]"
                   >
                     <FileCode2 className="h-4 w-4 text-[#708F96]" />
@@ -109,9 +111,7 @@ export default async function EditorPage({ params }: EditorPageProps) {
           </div>
         </aside>
 
-        {/* Editor Area */}
         <main className="flex-1 flex flex-col bg-[#1e1e1e] relative">
-          {/* Tabs */}
           <div className="flex border-b border-[#333] bg-[#252526] overflow-x-auto">
              <div className="flex items-center gap-2 px-4 py-2 border-t-2 border-[#AA895F] bg-[#1e1e1e] text-[#e0e0e0] text-sm min-w-[120px]">
                 <FileCode2 className="h-3 w-3 text-[#AA895F]" />
@@ -124,7 +124,6 @@ export default async function EditorPage({ params }: EditorPageProps) {
              </div>
           </div>
 
-          {/* Code Area Placeholder */}
           <div className="flex-1 p-4 font-mono text-sm text-[#d4d4d4] overflow-auto">
             <div className="flex items-center justify-center h-full flex-col gap-4 opacity-50">
                <Code2 className="h-16 w-16 text-[#333]" />
@@ -133,45 +132,13 @@ export default async function EditorPage({ params }: EditorPageProps) {
           </div>
         </main>
 
-        {/* AI Sidebar */}
-        <aside className="w-80 border-l border-[#333] bg-[#1e1e1e] flex flex-col">
-          <div className="p-3 border-b border-[#333] flex items-center gap-2">
-            <Bot className="h-4 w-4 text-[#AA895F]" />
-            <span className="text-xs font-semibold text-[#cccccc]">AI Architect</span>
-          </div>
-          
-          <div className="flex-1 p-4 overflow-y-auto space-y-4">
-             {/* AI Message */}
-             <div className="flex gap-3">
-               <div className="h-6 w-6 rounded bg-[#AA895F]/20 flex items-center justify-center shrink-0 mt-1">
-                 <Bot className="h-3 w-3 text-[#AA895F]" />
-               </div>
-               <div className="text-sm text-[#cccccc]">
-                 <p>I'm ready to help you build. Try asking:</p>
-                 <ul className="list-disc pl-4 mt-2 text-[#858585] space-y-1 text-xs">
-                    <li>Create a responsive navbar</li>
-                    <li>Add a pricing table with toggle</li>
-                    <li>Setup Prisma schema for Users</li>
-                 </ul>
-               </div>
-             </div>
-          </div>
-
-          <div className="p-4 border-t border-[#333] bg-[#252526]">
-            <div className="relative">
-              <textarea 
-                placeholder="Describe what to generate..."
-                className="w-full min-h-[100px] rounded-lg border border-[#333] bg-[#1e1e1e] px-3 py-2 text-sm text-[#e0e0e0] placeholder:text-[#666] focus:outline-none focus:border-[#708F96] resize-none"
-              />
-              <button 
-                type="submit"
-                className="absolute bottom-3 right-3 p-1.5 bg-gradient-brand text-white rounded-md hover:opacity-90 transition-opacity"
-              >
-                <ArrowLeft className="h-3 w-3 rotate-90" />
-              </button>
-            </div>
-          </div>
-        </aside>
+        <ChatInterface
+          messages={messages}
+          input={input}
+          handleInputChange={handleInputChange}
+          onSubmit={handleSubmit}
+          isLoading={isLoading}
+        />
       </div>
     </div>
   )

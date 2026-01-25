@@ -5,7 +5,7 @@
 @layer base {
   :root {
     --color-blue: #708F96;
-    --color-brown: #EED6B7;
+    --color-brown: #AA895F;
 
     --background: 224 10% 10%;
     --foreground: 210 40% 98%;
